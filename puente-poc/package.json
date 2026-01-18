@@ -1,0 +1,9 @@
+{
+  "name": "puente-poc",
+  "private": true,
+  "workspaces": [
+    "contracts",
+    "backend",
+    "frontend"
+  ]
+}

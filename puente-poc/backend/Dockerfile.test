@@ -1,0 +1,17 @@
+FROM oven/bun:1
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+# NestJS dependencies often need to be compatible with Node/Bun interop
+# For this PoC we rely on bun install reading package.json
+
+# Install dependencies
+RUN bun install
+
+# Copy source code
+COPY . .
+
+# Run tests using Bun's native runner
+CMD ["bun", "test"]
