@@ -14,7 +14,8 @@ export default () => ({
     blockchain: {
         rpcUrl: process.env.BLOCKCHAIN_RPC_URL || 'https://rpc-amoy.polygon.technology',
         chainId: parseInt(process.env.CHAIN_ID, 10) || 80002,
-        escrowAddress: process.env.ESCROW_CONTRACT_ADDRESS,
+        escrowAddress: process.env.ESCROW_ADDRESS || process.env.ESCROW_CONTRACT_ADDRESS,
+        usdcAddress: process.env.USDC_ADDRESS,
         operatorPrivateKey: process.env.OPERATOR_PRIVATE_KEY,
     },
 });

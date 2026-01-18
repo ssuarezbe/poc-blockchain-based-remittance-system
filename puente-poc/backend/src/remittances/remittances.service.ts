@@ -15,6 +15,26 @@ export class RemittancesService {
         private blockchainService: BlockchainService,
     ) { }
 
+    private addLog(remittance: Remittance, action: string, details?: any, error?: any) {
+        if (!remittance.logs) {
+            remittance.logs = [];
+        }
+
+        const prevEvent = remittance.logs.length > 0 ? remittance.logs[remittance.logs.length - 1] : null;
+
+        const newLog = {
+            eventId: crypto.randomUUID(),
+            prevEventId: prevEvent ? prevEvent.eventId : null,
+            action,
+            timestamp: new Date().toISOString(), // UTC by default
+            details,
+            error: error?.message,
+            stack: error?.stack,
+        };
+
+        remittance.logs.push(newLog);
+    }
+
     /**
      * Create a new remittance
      */
@@ -31,12 +51,10 @@ export class RemittancesService {
             amountCop,
             exchangeRate,
             status: RemittanceStatus.PENDING,
-            logs: [{
-                action: 'init',
-                timestamp: new Date().toISOString(),
-                details: { amount: dto.amountUsdc, recipient: dto.recipientId }
-            }]
+            logs: []
         });
+
+        this.addLog(remittance, 'init', { amount: dto.amountUsdc, recipient: dto.recipientId });
 
         try {
             // 2. Create on Blockchain (Server Signed)
@@ -48,21 +66,14 @@ export class RemittancesService {
 
             remittance.blockchainId = remittanceId;
             remittance.txHashCreate = txHash;
-            remittance.logs.push({
-                action: 'create_on_chain',
-                timestamp: new Date().toISOString(),
-                details: { txHash, remittanceId }
-            });
+
+            this.addLog(remittance, 'create_on_chain', { txHash, remittanceId });
+            remittance.status = RemittanceStatus.CREATED;
 
             return this.remittanceRepository.save(remittance);
         } catch (error) {
             remittance.status = RemittanceStatus.FAILED;
-            remittance.logs.push({
-                action: 'create_failed',
-                timestamp: new Date().toISOString(),
-                error: error.message,
-                stack: error.stack
-            });
+            this.addLog(remittance, 'create_failed', null, error);
             await this.remittanceRepository.save(remittance);
             throw error;
         }
@@ -130,13 +141,21 @@ export class RemittancesService {
             throw new ForbiddenException('Remittance must be funded to complete');
         }
 
-        const txHash = await this.blockchainService.releaseRemittance(remittance.blockchainId);
+        try {
+            const txHash = await this.blockchainService.releaseRemittance(remittance.blockchainId);
 
-        remittance.status = RemittanceStatus.COMPLETED;
-        remittance.txHashComplete = txHash;
-        remittance.completedAt = new Date();
+            remittance.status = RemittanceStatus.COMPLETED;
+            remittance.txHashComplete = txHash;
+            remittance.completedAt = new Date();
 
-        return this.remittanceRepository.save(remittance);
+            this.addLog(remittance, 'completed', { txHash });
+
+            return this.remittanceRepository.save(remittance);
+        } catch (error) {
+            this.addLog(remittance, 'complete_failed', null, error);
+            await this.remittanceRepository.save(remittance);
+            throw error;
+        }
     }
 
     /**
@@ -153,13 +172,21 @@ export class RemittancesService {
             throw new ForbiddenException('Remittance must be funded to refund');
         }
 
-        const txHash = await this.blockchainService.refundRemittance(remittance.blockchainId);
+        try {
+            const txHash = await this.blockchainService.refundRemittance(remittance.blockchainId);
 
-        remittance.status = RemittanceStatus.REFUNDED;
-        remittance.txHashComplete = txHash;
-        remittance.completedAt = new Date();
+            remittance.status = RemittanceStatus.REFUNDED;
+            remittance.txHashComplete = txHash;
+            remittance.completedAt = new Date();
 
-        return this.remittanceRepository.save(remittance);
+            this.addLog(remittance, 'refunded', { txHash });
+
+            return this.remittanceRepository.save(remittance);
+        } catch (error) {
+            this.addLog(remittance, 'refund_failed', null, error);
+            await this.remittanceRepository.save(remittance);
+            throw error;
+        }
     }
 
     /**
@@ -182,18 +209,33 @@ export class RemittancesService {
     async fund(id: string, userId: string): Promise<Remittance> {
         const remittance = await this.findOne(id, userId);
 
-        if (remittance.status !== RemittanceStatus.PENDING) {
-            throw new ForbiddenException('Remittance already funded or cancelled');
+        if (remittance.status !== RemittanceStatus.PENDING && remittance.status !== RemittanceStatus.CREATED) {
+            // Allow funding if PENDING (db only) or CREATED (db+chain)
+            // Ideally it should be CREATED, but if they are stuck in PENDING... 
+            // Actually, create sets it to CREATED now.
+            // Let's loosen to allow if not final state.
+            if (remittance.status === RemittanceStatus.COMPLETED || remittance.status === RemittanceStatus.REFUNDED)
+                throw new ForbiddenException('Remittance already finalized');
         }
 
-        // Execute chain tx
-        const txHash = await this.blockchainService.approveAndDeposit(remittance.blockchainId, remittance.amountUsdc);
+        try {
+            // Execute chain tx
+            const txHash = await this.blockchainService.approveAndDeposit(remittance.blockchainId, remittance.amountUsdc);
 
-        remittance.status = RemittanceStatus.FUNDED;
-        remittance.txHashFund = txHash;
-        remittance.fundedAt = new Date();
+            remittance.status = RemittanceStatus.FUNDED;
+            remittance.txHashFund = txHash;
+            remittance.fundedAt = new Date();
 
-        return this.remittanceRepository.save(remittance);
+            this.addLog(remittance, 'funded', { txHash });
+
+            return this.remittanceRepository.save(remittance);
+        } catch (error) {
+            this.addLog(remittance, 'fund_failed', null, error);
+            await this.remittanceRepository.save(remittance);
+            // Don't change status to failed if just fund failed? User can retry.
+            // But log the error.
+            throw error;
+        }
     }
 
     /**
