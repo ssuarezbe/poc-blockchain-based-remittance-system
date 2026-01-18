@@ -22,6 +22,10 @@ describe('RemittancesService', () => {
 
         mockBlockchainService = {
             getExchangeRate: jest.fn(() => 4000.0),
+            createRemittanceOnChain: jest.fn().mockResolvedValue({
+                remittanceId: '123',
+                txHash: '0xabc'
+            }),
         };
 
         const module: TestingModule = await Test.createTestingModule({

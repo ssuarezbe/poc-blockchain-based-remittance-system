@@ -81,4 +81,20 @@ export class RemittancesController {
         // TODO: Add admin guard
         return this.remittancesService.refund(id);
     }
+
+    /**
+     * Admin: Get all remittances
+     */
+    @Get('admin/all')
+    findAllAdmin() {
+        return this.remittancesService.findAllAdmin();
+    }
+
+    /**
+     * Fund a remittance (User action)
+     */
+    @Post(':id/fund')
+    fund(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+        return this.remittancesService.fund(id, user.id);
+    }
 }

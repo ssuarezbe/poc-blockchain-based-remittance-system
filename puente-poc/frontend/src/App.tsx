@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import NewRemittance from './pages/NewRemittance';
+import { AdminDashboard } from './pages/AdminDashboard';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading } = useAuth();
@@ -36,6 +37,7 @@ export default function App() {
                 >
                     <Route index element={<Dashboard />} />
                     <Route path="new" element={<NewRemittance />} />
+                    <Route path="admin" element={<AdminDashboard />} />
                 </Route>
             </Routes>
         </BrowserRouter>

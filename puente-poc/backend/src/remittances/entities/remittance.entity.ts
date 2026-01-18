@@ -64,6 +64,9 @@ export class Remittance {
     @Column({ nullable: true })
     txHashComplete: string;
 
+    @Column({ type: 'jsonb', nullable: true })
+    logs: any[];
+
     @CreateDateColumn()
     createdAt: Date;
 

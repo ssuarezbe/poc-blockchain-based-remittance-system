@@ -4,6 +4,7 @@ import { ethers, Contract, Wallet, JsonRpcProvider } from 'ethers';
 
 // Import ABI
 import * as RemittanceEscrowABI from '../abis/RemittanceEscrow.json';
+import * as MockUSDCABI from '../abis/MockUSDC.json';
 
 @Injectable()
 export class BlockchainService implements OnModuleInit {
@@ -11,6 +12,7 @@ export class BlockchainService implements OnModuleInit {
     private provider: JsonRpcProvider;
     private wallet: Wallet;
     private escrowContract: Contract;
+    private usdcContract: Contract;
 
     constructor(private configService: ConfigService) { }
 
@@ -18,9 +20,10 @@ export class BlockchainService implements OnModuleInit {
         const rpcUrl = this.configService.get<string>('blockchain.rpcUrl');
         const privateKey = this.configService.get<string>('blockchain.operatorPrivateKey');
         const escrowAddress = this.configService.get<string>('blockchain.escrowAddress');
+        const usdcAddress = this.configService.get<string>('blockchain.usdcAddress');
 
-        if (!privateKey || !escrowAddress) {
-            this.logger.warn('Blockchain config missing (private key or escrow address). Blockchain features disabled.');
+        if (!privateKey || !escrowAddress || !usdcAddress) {
+            this.logger.warn('Blockchain config missing (private key, escrow, or usdc). Blockchain features disabled.');
             return;
         }
 
@@ -31,9 +34,81 @@ export class BlockchainService implements OnModuleInit {
             RemittanceEscrowABI.abi,
             this.wallet,
         );
+        this.usdcContract = new ethers.Contract(
+            usdcAddress,
+            MockUSDCABI.abi,
+            this.wallet,
+        );
 
         this.logger.log(`Connected to blockchain at ${rpcUrl}`);
         this.logger.log(`Escrow contract: ${escrowAddress}`);
+    }
+
+    /**
+     * Create Remittance On-Chain (Server Signed)
+     * @param recipientId Identifier for recipient
+     * @param amountUsdc Amount in USDC
+     * @param exchangeRate Exchange rate
+     */
+    async createRemittanceOnChain(recipientId: string, amountUsdc: number, exchangeRate: number): Promise<{ remittanceId: string, txHash: string }> {
+        try {
+            const amountWei = ethers.parseUnits(amountUsdc.toString(), 6);
+            const rateScaled = Math.round(exchangeRate * 10000);
+
+            this.logger.log(`Creating remittance for ${recipientId} with amount ${amountUsdc} USDC`);
+            const tx = await this.escrowContract.createRemittance(recipientId, amountWei, rateScaled);
+            const receipt = await tx.wait();
+
+            // Find RemittanceCreated event
+            const event = receipt.logs.find(
+                (log: any) => {
+                    try {
+                        return this.escrowContract.interface.parseLog(log)?.name === 'RemittanceCreated';
+                    } catch (e) { return false; }
+                }
+            );
+
+            if (!event) throw new Error('RemittanceCreated event not found');
+
+            const parsed = this.escrowContract.interface.parseLog(event);
+
+            this.logger.log(`Created remittance on-chain: ${parsed.args.remittanceId}`);
+            return {
+                remittanceId: parsed.args.remittanceId,
+                txHash: receipt.hash,
+            };
+        } catch (error) {
+            this.logger.error(`Failed to create remittance on-chain: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Approve and Deposit Funds (Server Signed)
+     * @param remittanceId Blockchain ID of the remittance
+     * @param amountUsdc Amount to deposit
+     */
+    async approveAndDeposit(remittanceId: string, amountUsdc: number): Promise<string> {
+        try {
+            const amountWei = ethers.parseUnits(amountUsdc.toString(), 6);
+            const escrowAddr = await this.escrowContract.getAddress();
+
+            // 1. Approve
+            this.logger.log(`Approving ${amountUsdc} USDC for escrow...`);
+            const approveTx = await this.usdcContract.approve(escrowAddr, amountWei);
+            await approveTx.wait();
+
+            // 2. Deposit
+            this.logger.log(`Depositing for remittance ${remittanceId}...`);
+            const depositTx = await this.escrowContract.deposit(remittanceId);
+            const receipt = await depositTx.wait();
+
+            this.logger.log(`Deposited funds, tx: ${receipt.hash}`);
+            return receipt.hash;
+        } catch (error) {
+            this.logger.error(`Failed to deposit funds: ${error.message}`);
+            throw error;
+        }
     }
 
     /**

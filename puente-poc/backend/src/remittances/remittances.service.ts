@@ -22,6 +22,7 @@ export class RemittancesService {
         const exchangeRate = await this.blockchainService.getExchangeRate();
         const amountCop = dto.amountUsdc * exchangeRate;
 
+        // 1. Create on Db
         const remittance = this.remittanceRepository.create({
             senderId: user.id,
             recipientId: dto.recipientId,
@@ -30,9 +31,41 @@ export class RemittancesService {
             amountCop,
             exchangeRate,
             status: RemittanceStatus.PENDING,
+            logs: [{
+                action: 'init',
+                timestamp: new Date().toISOString(),
+                details: { amount: dto.amountUsdc, recipient: dto.recipientId }
+            }]
         });
 
-        return this.remittanceRepository.save(remittance);
+        try {
+            // 2. Create on Blockchain (Server Signed)
+            const { remittanceId, txHash } = await this.blockchainService.createRemittanceOnChain(
+                dto.recipientId,
+                dto.amountUsdc,
+                exchangeRate
+            );
+
+            remittance.blockchainId = remittanceId;
+            remittance.txHashCreate = txHash;
+            remittance.logs.push({
+                action: 'create_on_chain',
+                timestamp: new Date().toISOString(),
+                details: { txHash, remittanceId }
+            });
+
+            return this.remittanceRepository.save(remittance);
+        } catch (error) {
+            remittance.status = RemittanceStatus.FAILED;
+            remittance.logs.push({
+                action: 'create_failed',
+                timestamp: new Date().toISOString(),
+                error: error.message,
+                stack: error.stack
+            });
+            await this.remittanceRepository.save(remittance);
+            throw error;
+        }
     }
 
     /**
@@ -141,5 +174,35 @@ export class RemittancesService {
             usdcAddress,
             chainId: process.env.CHAIN_ID || '80002',
         };
+    }
+
+    /**
+     * Fund remittance (Server Signed)
+     */
+    async fund(id: string, userId: string): Promise<Remittance> {
+        const remittance = await this.findOne(id, userId);
+
+        if (remittance.status !== RemittanceStatus.PENDING) {
+            throw new ForbiddenException('Remittance already funded or cancelled');
+        }
+
+        // Execute chain tx
+        const txHash = await this.blockchainService.approveAndDeposit(remittance.blockchainId, remittance.amountUsdc);
+
+        remittance.status = RemittanceStatus.FUNDED;
+        remittance.txHashFund = txHash;
+        remittance.fundedAt = new Date();
+
+        return this.remittanceRepository.save(remittance);
+    }
+
+    /**
+     * Admin: Get all remittances with full details
+     */
+    async findAllAdmin(): Promise<Remittance[]> {
+        return this.remittanceRepository.find({
+            order: { createdAt: 'DESC' },
+            relations: ['sender'],
+        });
     }
 }

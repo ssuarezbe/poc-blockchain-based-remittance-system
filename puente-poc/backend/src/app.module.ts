@@ -11,6 +11,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
 import { RatesModule } from './rates/rates.module';
 import { User } from './users/entities/user.entity';
 import { Remittance } from './remittances/entities/remittance.entity';
+import { LogsController } from './logs/logs.controller';
 
 @Module({
     imports: [
@@ -47,6 +48,6 @@ import { Remittance } from './remittances/entities/remittance.entity';
         BlockchainModule,
         RatesModule,
     ],
-    controllers: [AppController],
+    controllers: [AppController, LogsController],
 })
 export class AppModule { }
