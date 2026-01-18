@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, OnModuleInit, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -8,12 +8,28 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+    private readonly logger = new Logger(AuthService.name);
+
     constructor(
         @InjectRepository(User)
         private userRepository: Repository<User>,
         private jwtService: JwtService,
     ) { }
+
+    async onModuleInit() {
+        const defaultEmail = 'default@example.com';
+        const existing = await this.userRepository.findOne({ where: { email: defaultEmail } });
+
+        if (!existing) {
+            this.logger.log(`Seeding default user: ${defaultEmail}`);
+            await this.register({
+                email: defaultEmail,
+                password: 'defa-key-2026$',
+                walletAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', // Example address (Hardhat #1)
+            });
+        }
+    }
 
     async register(dto: RegisterDto) {
         const existing = await this.userRepository.findOne({

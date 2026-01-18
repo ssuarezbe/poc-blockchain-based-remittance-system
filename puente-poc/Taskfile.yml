@@ -1,0 +1,39 @@
+version: '3'
+
+tasks:
+  up:
+    desc: Start all services using Podman
+    cmds:
+      - podman-compose -f docker-compose.podman.yml down || true
+      - podman-compose -f docker-compose.podman.yml up -d --build
+
+  down:
+    desc: Stop all services
+    cmds:
+      - podman-compose -f docker-compose.podman.yml down
+
+  logs:
+    desc: View logs
+    cmds:
+      - podman-compose -f docker-compose.podman.yml logs -f
+
+  deploy-contracts:
+    desc: Deploy contracts to local blockchain node
+    cmds:
+      - echo "Deploying contracts..."
+      - podman exec -it puente-blockchain npx hardhat run scripts/deploy.ts --network localhost
+
+  setup:
+    desc: Full setup (up + wait + deploy)
+    cmds:
+      - task: up
+      - echo "Waiting for services to initialize..."
+      - sleep 10
+      - task: deploy-contracts
+      - echo "Setup complete! Please update backend env vars if needed."
+      - echo "Check logs with 'task logs'"
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - cd backend && podman build -f Dockerfile.test -t puente-backend-test . && podman run --rm puente-backend-test

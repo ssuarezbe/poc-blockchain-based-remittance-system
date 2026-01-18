@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AppController } from './app.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import configuration from './config/configuration';
@@ -46,5 +47,6 @@ import { Remittance } from './remittances/entities/remittance.entity';
         BlockchainModule,
         RatesModule,
     ],
+    controllers: [AppController],
 })
 export class AppModule { }
