@@ -32,6 +32,17 @@ tasks:
       - task: deploy-contracts
       - echo "Setup complete! Please update backend env vars if needed."
       - echo "Check logs with 'task logs'"
+      - task: smoke-test
+
+  smoke-test:
+    desc: Run smoke tests inside the container network
+    cmds:
+      - |
+        podman run --rm \
+          --network puente-poc_puente-net \
+          -v ./scripts:/scripts \
+          node:20-slim \
+          node /scripts/smoke-test.js
 
   test:
     desc: Run unit tests

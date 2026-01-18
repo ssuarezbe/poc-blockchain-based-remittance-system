@@ -10,4 +10,4 @@ COPY . .
 # Expose Hardhat node port
 EXPOSE 8545
 
-CMD ["npx", "hardhat", "node"]
+CMD ["npx", "hardhat", "node", "--hostname", "0.0.0.0"]
