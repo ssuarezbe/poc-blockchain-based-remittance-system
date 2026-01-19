@@ -15,7 +15,7 @@ This specification enables LLM coding assistants (Claude Code, Cursor, Copilot, 
 
 
 
-![Screenshot](misc/Screenshot%202026-01-19%20at%2011.39.22%20AM.png)
-![Screenshot](misc/Screenshot%202026-01-19%20at%2011.20.02%20AM.png)
-![Screenshot](misc/Screenshot%202026-01-19%20at%2011.19.55%20AM.png)
-![Screenshot](misc/Screenshot%202026-01-19%20at%2011.19.12%20AM.png)
+![Dashboard Main](misc/dashboard-main.png)
+![Dashboard Release](misc/dashboard-release.png)
+![Dashboard Fund](misc/dashboard-fund.png)
+![Dashboard Create](misc/dashboard-create.png)
