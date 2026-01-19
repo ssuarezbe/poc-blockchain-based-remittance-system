@@ -17,20 +17,35 @@ const statusColors: Record<string, string> = {
 
 export default function RemittanceCard({ remittance, contract, token, onUpdate }: Props) {
     const handleFund = async () => {
+        // contract.address is always present in server-managed mode, but keeping check is fine
         if (!contract.address || !remittance.blockchainId) return;
 
         try {
-            await contract.approveUsdc(remittance.amountUsdc);
-            const txHash = await contract.deposit(remittance.blockchainId);
+            // Server-managed: We don't need to approve USDC on client side.
+            // We just call the deposit method which maps to backend API.
+            // The backend handles the blockchain tx and status update.
+            await contract.deposit(remittance.id, remittance.amountUsdc);
 
-            const updated = await remittancesApi.update(
-                remittance.id,
-                { txHashFund: txHash, status: 'funded' },
-                token
-            );
-            onUpdate(updated);
+            // We don't need to manually update via API because the contract.deposit (which calls backend /fund) 
+            // does the action. However, to update the UI local state immediately, we can fake it or re-fetch.
+            // But since onUpdate expects a full object, we might need to fetch the updated remittance
+            // or just assume success and update status.
+
+            // Ideally backend returns the updated remittance. 
+            // Let's modify useContract.deposit to return the result if possible, but for now
+            // we will just optimistically update the UI or reload.
+
+            // For now, let's just trigger an update with 'funded' status
+            onUpdate({
+                ...remittance,
+                status: 'funded',
+                // We don't have the txHash immediately unless we change return type of deposit
+                // But that's fine for UI feedback.
+            });
+
         } catch (err) {
             console.error('Failed to fund:', err);
+            // Could show error toast here
         }
     };
 

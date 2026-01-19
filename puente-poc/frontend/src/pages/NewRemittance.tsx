@@ -49,17 +49,15 @@ export default function NewRemittance() {
     };
 
     const handleConfirm = async () => {
-        if (!contract.address) {
-            setError('Please connect your wallet first');
-            return;
-        }
+        // We server-manage wallets now, so we don't strictly need "connect wallet" unless we want to link user address?
+        // But for now, we assume user is logged in via email.
 
         setStep('processing');
         setError(null);
 
         try {
-            // 1. Create in database
-            setTxStatus('Creating remittance...');
+            // 1. Create in database (which now also creates on blockchain)
+            setTxStatus('Creating remittance and processing on blockchain...');
             const remittance = await remittancesApi.create(
                 {
                     recipientId,
@@ -69,30 +67,8 @@ export default function NewRemittance() {
                 token!
             );
 
-            // 2. Create on blockchain
-            setTxStatus('Creating on blockchain...');
-            const { remittanceId, txHash } = await contract.createRemittance(
-                recipientId,
-                parseFloat(amountUsdc),
-                rate
-            );
-
-            // 3. Update database with blockchain ID
-            await remittancesApi.update(
-                remittance.id,
-                {
-                    blockchainId: remittanceId,
-                    txHashCreate: txHash,
-                    status: 'created',
-                },
-                token!
-            );
-
             setTxStatus('Complete! The remittance has been created on-chain. Please fund it from the dashboard.');
             setTimeout(() => navigate('/'), 3000);
-
-            // Note: We separated funding to a separate step in the Dashboard to make the flow robust
-            // against user rejecting 2nd transaction or other failures.
 
         } catch (err) {
             console.error(err);

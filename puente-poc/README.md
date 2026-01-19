@@ -68,6 +68,51 @@ This project uses **Podman** and **Taskfile** for easy local deployment and mana
 - `backend/`: NestJS API (Port 3000)
 - `frontend/`: React + Vite UI (Port 5173)
 
+## 📊 Remittance Status Workflow
+
+Understanding the lifecycle of a remittance is key to debugging and verification.
+
+### Status Definitions
+
+- `PENDING`: Initial state when user starts the flow. Database record created, but blockchain transaction not yet initiated or confirmed.
+- `CREATED`: Blockchain contract (Escrow) has successfully created the remittance record on-chain.
+- `FUNDED`: User has deposited the USDC amount into the contract. Funds are locked.
+- `COMPLETED`: Admin/Operator has released the funds to the recipient. Cycle complete.
+- `REFUNDED`: Admin/Operator has returned the funds to the sender.
+- `FAILED`: An error occurred during creation or processing.
+
+### ✅ Successful Flow
+
+1.  **PENDING** → **CREATED**:
+    -   User clicks "Create".
+    -   Backend creates DB record (`PENDING`).
+    -   Backend signs and sends `createRemittance` tx to blockchain.
+    -   On tx success, status updates to `CREATED`.
+
+2.  **CREATED** → **FUNDED**:
+    -   User clicks "Fund" in Dashboard.
+    -   Backend signs and sends `deposit` tx to blockchain.
+    -   On tx success, status updates to `FUNDED`.
+
+3.  **FUNDED** → **COMPLETED**:
+    -   Admin reviews and clicks "Complete" (Release).
+    -   Backend signs and sends `release` tx.
+    -   On tx success, status updates to `COMPLETED`.
+
+### ❌ Error/Alternative Flows
+
+-   **PENDING** → **FAILED**:
+    -   If the blockchain transaction to create the remittance fails (e.g., operator out of gas, contract reverted).
+    -   The remittance stops here and cannot be funded.
+
+-   **FUNDED** → **REFUNDED**:
+    -   If the transaction cannot be completed (e.g., incorrect recipient), Admin clicks "Refund".
+    -   Funds are returned to sender on-chain.
+    -   Status updates to `REFUNDED`.
+
+-   **Stuck in PENDING?**
+    -   Check backend logs. It usually means the blockchain transaction is incomplete or the backend failed to update the status after the transaction.
+
 ## ✅ Manual Verification Steps
 
 Follow these steps to verify the system works locally:

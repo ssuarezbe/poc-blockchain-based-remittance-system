@@ -11,6 +11,7 @@ interface Log {
     error?: string;
     details?: any;
     stack?: string;
+    trace?: string;
 }
 
 interface Remittance {
@@ -46,6 +47,12 @@ export const AdminDashboard = () => {
                 });
                 setRemittances(response.data);
             } catch (err: any) {
+                if (err.response?.status === 401) {
+                    // Cold start or session expired
+                    localStorage.removeItem('puente_token');
+                    window.location.href = '/login';
+                    return;
+                }
                 setError(err.message || 'Failed to fetch');
             } finally {
                 setLoading(false);
@@ -145,9 +152,15 @@ export const AdminDashboard = () => {
                                                                     {format(parseISO(log.timestamp), 'yyyy-MM-dd HH:mm:ss.SSS')} UTC
                                                                 </div>
                                                                 {log.details && (
-                                                                    <pre className="text-xs bg-gray-50 p-2 rounded text-gray-600 overflow-x-auto">
+                                                                    <pre className="text-xs bg-gray-50 p-2 rounded text-gray-600 overflow-x-auto mt-2">
                                                                         {JSON.stringify(log.details, null, 2)}
                                                                     </pre>
+                                                                )}
+                                                                {log.trace && (
+                                                                    <details className="mt-1 text-xs text-gray-400">
+                                                                        <summary>Trace</summary>
+                                                                        <pre className="mt-1 bg-gray-50 p-2 rounded overflow-x-auto">{log.trace}</pre>
+                                                                    </details>
                                                                 )}
                                                                 {log.error && (
                                                                     <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">

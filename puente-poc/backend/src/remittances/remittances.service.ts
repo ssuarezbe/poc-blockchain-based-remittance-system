@@ -30,6 +30,7 @@ export class RemittancesService {
             details,
             error: error?.message,
             stack: error?.stack,
+            trace: new Error().stack, // Capture trace for all events as requested
         };
 
         remittance.logs.push(newLog);

@@ -32,7 +32,7 @@ export const useContract = (config: any | null): UseContractReturn => {
         setIsConnecting(true);
         setError(null);
         try {
-            const token = localStorage.getItem('access_token');
+            const token = localStorage.getItem('puente_token');
             if (!token) throw new Error('Not authenticated');
 
             // The backend now handles the blockchain creation automatically
@@ -78,7 +78,7 @@ export const useContract = (config: any | null): UseContractReturn => {
         setIsConnecting(true);
         setError(null);
         try {
-            const token = localStorage.getItem('access_token');
+            const token = localStorage.getItem('puente_token');
             if (!token) throw new Error('Not authenticated');
 
             // Call the fund endpoint
