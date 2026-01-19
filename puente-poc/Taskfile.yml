@@ -17,21 +17,48 @@ tasks:
     cmds:
       - podman-compose -f docker-compose.podman.yml logs -f
 
+  start-infra:
+    desc: Start blockchain and database only
+    cmds:
+      - podman-compose -f docker-compose.podman.yml up -d --build blockchain postgres
+      - echo "Waiting for blockchain to be ready..."
+      - sleep 5
+
   deploy-contracts:
-    desc: Deploy contracts to local blockchain node
+    desc: Deploy contracts and update .env with new addresses
     cmds:
       - echo "Deploying contracts..."
-      - podman exec -it puente-blockchain npx hardhat run scripts/deploy.ts --network localhost
+      - |
+        OUTPUT=$(podman exec -it puente-blockchain npx hardhat run scripts/deploy.ts --network localhost)
+        echo "$OUTPUT"
+        USDC=$(echo "$OUTPUT" | grep "USDC_ADDRESS=" | cut -d'=' -f2 | tr -d '\r')
+        ESCROW=$(echo "$OUTPUT" | grep "ESCROW_ADDRESS=" | cut -d'=' -f2 | tr -d '\r')
+        
+        if [ -z "$USDC" ] || [ -z "$ESCROW" ]; then
+          echo "Error: Failed to capture contract addresses."
+          exit 1
+        fi
+
+        echo "Captured Addresses -> USDC: $USDC, ESCROW: $ESCROW"
+        
+        # Write to .env file for docker-compose to pick up
+        echo "USDC_ADDRESS=$USDC" > .env
+        echo "ESCROW_ADDRESS=$ESCROW" >> .env
+        echo "Updated .env with new contract addresses."
+
+  start-apps:
+    desc: Start backend and frontend (requires .env from deploy)
+    cmds:
+      - podman-compose -f docker-compose.podman.yml up -d --build backend frontend
 
   setup:
-    desc: Full setup (up + wait + deploy)
+    desc: Full setup with dynamic configuration
     cmds:
-      - task: up
-      - echo "Waiting for services to initialize..."
-      - sleep 10
+      - task: down
+      - task: start-infra
       - task: deploy-contracts
-      - echo "Setup complete! Please update backend env vars if needed."
-      - echo "Check logs with 'task logs'"
+      - task: start-apps
+      - echo "Setup complete! Backend configured with latest contracts."
       - task: smoke-test
 
   smoke-test:
