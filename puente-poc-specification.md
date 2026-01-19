@@ -12,20 +12,36 @@ A simplified blockchain-powered remittance system that allows users to send USDC
 
 ### 1.2 Core User Flow
 
-1. Sender creates a remittance (specifies amount in USD and recipient info)
-2. Sender deposits USDC into escrow smart contract
-3. Operator (admin) confirms off-chain COP delivery
-4. Smart contract releases funds / marks complete
+1. Sender creates a remittance (specifies amount in USD and recipient info).
+2. Backend creates record in DB and executes `createRemittance` transaction on-chain (Server Wallet).
+3. Sender clicks "Fund" in UI.
+4. Backend executes `approve` and `deposit` transactions on-chain (Server Wallet).
+5. Operator (admin) confirms off-chain COP delivery.
+6. Smart contract releases funds / marks complete.
 
 ### 1.3 Tech Stack Summary
 
 | Layer | Technology |
 |-------|------------|
 | Smart Contracts | Solidity 0.8.20+, Hardhat, OpenZeppelin |
-| Backend | NestJS 10+, TypeScript, TypeORM, PostgreSQL |
-| Frontend | React 18+, Vite, TypeScript, ethers.js v6, TailwindCSS |
+| Backend | NestJS 10+, TypeScript, TypeORM, PostgreSQL, ethers.js v6 (Server Signing) |
+| Frontend | React 18+, Vite, TypeScript, TailwindCSS (No Web3/MetaMask dependency) |
 | Blockchain | Polygon Amoy Testnet (or Base Sepolia) |
 | Testing | Hardhat tests (Chai), Jest (backend), Vitest (frontend) |
+
+### 1.4 Architecture Justification (Custodial vs. Non-Custodial)
+
+This project implements a **Server-Managed (Custodial)** architecture.
+
+*   **Rationale**: To provide a seamless "Web2-like" experience where users do not need to manage private keys or install browser extensions. This ensures the Proof of Concept is accessible and reliable in all testing environments.
+*   **Business Value**:
+    *   **Gas Abstraction**: Removing the need for users to hold ETH/MATIC significantly lowers the barrier to entry.
+    *   **Compliance**: Centralized transaction signing allows for pre-chain KYC/AML checks.
+    *   **Recovery**: Password resets are possible; Seed Phrase loss is not a catastrophic failure mode.
+*   **Trade-off**: While this centralizes trust (the platform holds the keys) and liability, it eliminates the #1 friction point for blockchain adoption: onboarding.
+*   **Comparison**:
+    *   **Server-Managed**: Backend signs transactions. High UX, Trust-based.
+    *   **Client-Side**: User signs via MetaMask. Low UX, Trustless.
 
 ---
 
