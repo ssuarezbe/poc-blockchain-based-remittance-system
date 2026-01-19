@@ -78,9 +78,13 @@ export default function RemittanceCard({ remittance, contract, token, onUpdate }
             {remittance.status === 'created' && contract.address && (
                 <button
                     onClick={handleFund}
-                    className="mt-3 w-full bg-blue-600 text-white py-1 rounded text-sm hover:bg-blue-700"
+                    disabled={contract.isConnecting}
+                    className={`mt-3 w-full text-white py-1 rounded text-sm ${contract.isConnecting
+                            ? 'bg-blue-400 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
                 >
-                    Fund Remittance
+                    {contract.isConnecting ? 'Processing...' : 'Fund Remittance'}
                 </button>
             )}
 

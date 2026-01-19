@@ -16,6 +16,14 @@ tasks:
     desc: View logs
     cmds:
       - podman-compose -f docker-compose.podman.yml logs -f
+  
+  clean:
+    desc: Stop services and remove persistent volumes (Fresh Start)
+    cmds:
+      - task: down
+      - echo "Removing volumes..."
+      - podman volume rm puente-poc_postgres_data || true
+      - echo "System cleaned."
 
   start-infra:
     desc: Start blockchain and database only
