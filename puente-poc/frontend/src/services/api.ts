@@ -65,6 +65,20 @@ export const remittancesApi = {
 
     getConfig: (token: string) =>
         api<ContractConfig>('/remittances/config', { token }),
+
+    get: (id: string, token: string) =>
+        api<Remittance>(`/remittances/${id}`, { token }),
+
+    fund: (id: string, token: string) =>
+        api<Remittance>(`/remittances/${id}/fund`, { method: 'POST', token }),
+
+    // Admin Release
+    release: (id: string, token: string) =>
+        api<Remittance>(`/remittances/${id}/release`, { method: 'POST', token }),
+
+    // Receiver Claim
+    receive: (id: string, token: string) =>
+        api<Remittance>(`/remittances/${id}/receive`, { method: 'POST', token }),
 };
 
 // Types

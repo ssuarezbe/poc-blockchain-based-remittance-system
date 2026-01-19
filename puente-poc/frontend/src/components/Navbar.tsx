@@ -9,14 +9,14 @@ export default function Navbar() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16">
                     <div className="flex">
-                        <Link to="/" className="flex-shrink-0 flex items-center">
-                            <span className="text-xl font-bold text-blue-600">Puente</span>
-                        </Link>
+                        <Link to="/" className="text-gray-700 hover:text-blue-600 font-medium">Dashboard</Link>
+                        <Link to="/create" className="text-gray-700 hover:text-blue-600 font-medium">New Remittance</Link>
+                        <Link to="/receive" className="text-gray-700 hover:text-blue-600 font-medium">Receive</Link>
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-4">
                         {user && (
                             <>
-                                <span className="text-sm text-gray-700 mr-4">{user.email}</span>
+                                <span className="text-sm text-gray-700">{user.email}</span>
                                 <button
                                     onClick={logout}
                                     className="text-sm text-gray-500 hover:text-gray-900"

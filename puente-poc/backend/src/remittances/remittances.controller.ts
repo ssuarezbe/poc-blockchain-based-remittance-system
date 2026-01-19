@@ -7,6 +7,7 @@ import {
     Param,
     UseGuards,
     ParseUUIDPipe,
+    Req,
 } from '@nestjs/common';
 import { RemittancesService } from './remittances.service';
 import { CreateRemittanceDto } from './dto/create-remittance.dto';
@@ -49,28 +50,37 @@ export class RemittancesController {
      */
     @Get(':id')
     findOne(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
-        return this.remittancesService.findOne(id, user.id);
+        return this.remittancesService.findOne(id);
     }
 
     /**
-     * Update remittance (after blockchain tx)
+     * Update remittance (Legacy/Manual)
      */
     @Patch(':id')
     update(
-        @CurrentUser() user: User,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: UpdateRemittanceDto,
     ) {
-        return this.remittancesService.update(id, user.id, dto);
+        return this.remittancesService.update(id, undefined, dto);
     }
 
     /**
-     * Admin: Complete remittance
+     * Admin: Release funds (Server-Managed)
      */
-    @Post(':id/complete')
-    complete(@Param('id', ParseUUIDPipe) id: string) {
+    @Post(':id/release')
+    release(@Param('id', ParseUUIDPipe) id: string) {
         // TODO: Add admin guard
-        return this.remittancesService.complete(id);
+        return this.remittancesService.release(id);
+    }
+
+    /**
+     * Receiver: Claim/Receive funds
+     */
+    @Post(':id/receive')
+    receive(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+        const ip = req.ip || req.connection.remoteAddress;
+        const ua = req.headers['user-agent'];
+        return this.remittancesService.receive(id, { ip, ua });
     }
 
     /**
@@ -91,10 +101,10 @@ export class RemittancesController {
     }
 
     /**
-     * Fund a remittance (User action)
+     * Fund a remittance (User action -> Server Signs)
      */
     @Post(':id/fund')
-    fund(@CurrentUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
-        return this.remittancesService.fund(id, user.id);
+    fund(@Param('id', ParseUUIDPipe) id: string) {
+        return this.remittancesService.fund(id);
     }
 }

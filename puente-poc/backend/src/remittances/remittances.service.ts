@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Remittance, RemittanceStatus } from './entities/remittance.entity';
@@ -6,13 +6,21 @@ import { CreateRemittanceDto } from './dto/create-remittance.dto';
 import { UpdateRemittanceDto } from './dto/update-remittance.dto';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { User } from '../users/entities/user.entity';
+import * as crypto from 'crypto';
+import { ReceivedRemittance } from './entities/received-remittance.entity';
+import { RatesService } from '../rates/rates.service';
 
 @Injectable()
 export class RemittancesService {
+    private readonly logger = new Logger(RemittancesService.name);
+
     constructor(
         @InjectRepository(Remittance)
         private remittanceRepository: Repository<Remittance>,
+        @InjectRepository(ReceivedRemittance)
+        private receivedRemittanceRepository: Repository<ReceivedRemittance>,
         private blockchainService: BlockchainService,
+        private ratesService: RatesService,
     ) { }
 
     private addLog(remittance: Remittance, action: string, details?: any, error?: any) {
@@ -93,7 +101,7 @@ export class RemittancesService {
     /**
      * Find one remittance by ID
      */
-    async findOne(id: string, userId: string): Promise<Remittance> {
+    async findOne(id: string, userId?: string): Promise<Remittance> {
         const remittance = await this.remittanceRepository.findOne({
             where: { id },
         });
@@ -102,7 +110,7 @@ export class RemittancesService {
             throw new NotFoundException('Remittance not found');
         }
 
-        if (remittance.senderId !== userId) {
+        if (userId && remittance.senderId !== userId) {
             throw new ForbiddenException('Access denied');
         }
 
@@ -112,7 +120,7 @@ export class RemittancesService {
     /**
      * Update remittance (after blockchain transactions)
      */
-    async update(id: string, userId: string, dto: UpdateRemittanceDto): Promise<Remittance> {
+    async update(id: string, userId: string | undefined, dto: UpdateRemittanceDto): Promise<Remittance> {
         const remittance = await this.findOne(id, userId);
 
         Object.assign(remittance, dto);
@@ -131,29 +139,63 @@ export class RemittancesService {
     /**
      * Admin: Complete a remittance (release funds)
      */
-    async complete(id: string): Promise<Remittance> {
-        const remittance = await this.remittanceRepository.findOne({ where: { id } });
-
-        if (!remittance) {
-            throw new NotFoundException('Remittance not found');
-        }
-
+    async release(id: string): Promise<Remittance> {
+        const remittance = await this.findOne(id);
         if (remittance.status !== RemittanceStatus.FUNDED) {
-            throw new ForbiddenException('Remittance must be funded to complete');
+            throw new BadRequestException(`Remittance must be FUNDED to release. Current status: ${remittance.status}`);
         }
+
+        this.addLog(remittance, 'release_init');
 
         try {
+            // Server-Managed Release (Admin triggered)
             const txHash = await this.blockchainService.releaseRemittance(remittance.blockchainId);
 
             remittance.status = RemittanceStatus.COMPLETED;
-            remittance.txHashComplete = txHash;
             remittance.completedAt = new Date();
-
-            this.addLog(remittance, 'completed', { txHash });
+            remittance.txHashComplete = txHash;
+            this.addLog(remittance, 'release_success', { txHash });
 
             return this.remittanceRepository.save(remittance);
         } catch (error) {
-            this.addLog(remittance, 'complete_failed', null, error);
+            this.addLog(remittance, 'release_failed', null, error);
+            await this.remittanceRepository.save(remittance);
+            throw error;
+        }
+    }
+
+    async receive(id: string, metadata: { ip: string, ua: string }): Promise<Remittance> {
+        const remittance = await this.findOne(id);
+
+        if (remittance.status !== RemittanceStatus.FUNDED) {
+            throw new BadRequestException(`Remittance is not ready to be received. Status: ${remittance.status}`);
+        }
+
+        this.addLog(remittance, 'receive_init', metadata);
+
+        try {
+            // 1. Execute Blockchain Release (Server-Managed)
+            // Ideally, this should be "claim" on contract if the receiver was signing, 
+            // but in this Server-Managed flow, "receiving" triggers the release.
+            const txHash = await this.blockchainService.releaseRemittance(remittance.blockchainId);
+
+            // 2. Create Received Record
+            const receivedRecord = this.receivedRemittanceRepository.create({
+                remittance,
+                ipAddress: metadata.ip,
+                userAgent: metadata.ua
+            });
+            await this.receivedRemittanceRepository.save(receivedRecord);
+
+            // 3. Update Main Record
+            remittance.status = RemittanceStatus.COMPLETED;
+            remittance.completedAt = new Date();
+            remittance.txHashComplete = txHash;
+            this.addLog(remittance, 'receive_success', { txHash, receivedId: receivedRecord.id });
+
+            return this.remittanceRepository.save(remittance);
+        } catch (error) {
+            this.addLog(remittance, 'receive_failed', null, error);
             await this.remittanceRepository.save(remittance);
             throw error;
         }
@@ -207,7 +249,7 @@ export class RemittancesService {
     /**
      * Fund remittance (Server Signed)
      */
-    async fund(id: string, userId: string): Promise<Remittance> {
+    async fund(id: string, userId?: string): Promise<Remittance> {
         const remittance = await this.findOne(id, userId);
 
         if (remittance.status !== RemittanceStatus.PENDING && remittance.status !== RemittanceStatus.CREATED) {

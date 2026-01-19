@@ -7,5 +7,6 @@ import { BlockchainModule } from '../blockchain/blockchain.module';
     imports: [BlockchainModule],
     controllers: [RatesController],
     providers: [RatesService],
+    exports: [RatesService],
 })
 export class RatesModule { }
