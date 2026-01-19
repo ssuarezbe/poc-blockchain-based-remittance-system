@@ -11,6 +11,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
 import { RatesModule } from './rates/rates.module';
 import { User } from './users/entities/user.entity';
 import { Remittance } from './remittances/entities/remittance.entity';
+import { ReceivedRemittance } from './remittances/entities/received-remittance.entity';
 import { LogsController } from './logs/logs.controller';
 
 @Module({
@@ -28,7 +29,7 @@ import { LogsController } from './logs/logs.controller';
                 username: configService.get('database.username'),
                 password: configService.get('database.password'),
                 database: configService.get('database.database'),
-                entities: [User, Remittance],
+                entities: [User, Remittance, ReceivedRemittance],
                 synchronize: true, // Disable in production
             }),
             inject: [ConfigService],
