@@ -66,6 +66,10 @@ export const AdminDashboard = () => {
         setExpandedRow(expandedRow === id ? null : id);
     };
 
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text).catch(console.error);
+    };
+
     if (loading) return <div className="p-8">Loading...</div>;
     if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
 
@@ -78,6 +82,7 @@ export const AdminDashboard = () => {
                     <thead>
                         <tr className="bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             <th className="px-4 py-3"></th>
+                            <th className="px-5 py-3">Remittance ID</th>
                             <th className="px-5 py-3">Created (UTC)</th>
                             <th className="px-5 py-3">User</th>
                             <th className="px-5 py-3">Recipient</th>
@@ -96,6 +101,19 @@ export const AdminDashboard = () => {
                                 >
                                     <td className="px-4 py-5 text-gray-500">
                                         {expandedRow === rem.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    </td>
+                                    <td className="px-5 py-5 text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-700">
+                                                {rem.id.substring(0, 8)}...
+                                            </code>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); copyToClipboard(rem.id); }}
+                                                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
                                     </td>
                                     <td className="px-5 py-5 text-sm font-mono text-gray-600">
                                         {format(parseISO(rem.createdAt), 'yyyy-MM-dd HH:mm:ss')}
@@ -123,7 +141,7 @@ export const AdminDashboard = () => {
                                 </tr>
                                 {expandedRow === rem.id && (
                                     <tr className="bg-gray-50">
-                                        <td colSpan={7} className="px-8 py-6 border-b border-gray-200">
+                                        <td colSpan={8} className="px-8 py-6 border-b border-gray-200">
                                             <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center">
                                                 <Activity size={16} className="mr-2" /> Event History Chain
                                             </h4>

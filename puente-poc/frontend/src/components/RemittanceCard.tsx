@@ -15,6 +15,11 @@ const statusColors: Record<string, string> = {
     refunded: 'bg-red-100 text-red-800',
 };
 
+// Simple copy to clipboard helper
+const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).catch(console.error);
+};
+
 export default function RemittanceCard({ remittance, contract, token, onUpdate }: Props) {
     const handleFund = async () => {
         // contract.address is always present in server-managed mode, but keeping check is fine
@@ -74,14 +79,29 @@ export default function RemittanceCard({ remittance, contract, token, onUpdate }
                     {new Date(remittance.createdAt).toLocaleDateString()}
                 </p>
             </div>
+            {/* ID Display for Receiver Flow */}
+            <div className="mt-4 p-2 bg-gray-50 rounded border border-gray-100 text-xs">
+                <div className="flex justify-between items-center text-gray-500 mb-1">
+                    <span>Remittance ID</span>
+                    <button
+                        onClick={() => copyToClipboard(remittance.id)}
+                        className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                    >
+                        Copy
+                    </button>
+                </div>
+                <code className="block w-full overflow-hidden text-ellipsis font-mono text-gray-700 bg-white px-2 py-1 rounded border border-gray-200">
+                    {remittance.id}
+                </code>
+            </div>
 
             {remittance.status === 'created' && contract.address && (
                 <button
                     onClick={handleFund}
                     disabled={contract.isConnecting}
                     className={`mt-3 w-full text-white py-1 rounded text-sm ${contract.isConnecting
-                            ? 'bg-blue-400 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700'
+                        ? 'bg-blue-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                 >
                     {contract.isConnecting ? 'Processing...' : 'Fund Remittance'}
@@ -89,14 +109,22 @@ export default function RemittanceCard({ remittance, contract, token, onUpdate }
             )}
 
             {remittance.txHashFund && (
-                <a
-                    href={`https://amoy.polygonscan.com/tx/${remittance.txHashFund}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline mt-2 block"
-                >
-                    View on Explorer
-                </a>
+                <div className="mt-2">
+                    {import.meta.env.VITE_BLOCK_EXPLORER_URL ? (
+                        <a
+                            href={`${import.meta.env.VITE_BLOCK_EXPLORER_URL}/tx/${remittance.txHashFund}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline block"
+                        >
+                            View on Explorer
+                        </a>
+                    ) : (
+                        <span className="text-xs text-gray-400 block" title="Local Network - No Explorer">
+                            Tx: {remittance.txHashFund.substring(0, 10)}...
+                        </span>
+                    )}
+                </div>
             )}
         </div>
     );
