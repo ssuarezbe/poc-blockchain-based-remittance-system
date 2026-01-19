@@ -48,3 +48,9 @@ tasks:
     desc: Run unit tests
     cmds:
       - cd backend && podman build -f Dockerfile.test -t puente-backend-test . && podman run --rm puente-backend-test
+
+  test-contracts:
+    desc: Run smart contract unit tests
+    cmds:
+      - echo "Running smart contract tests..."
+      - podman exec -it puente-blockchain npx hardhat test

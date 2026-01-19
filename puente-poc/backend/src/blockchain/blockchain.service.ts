@@ -93,14 +93,20 @@ export class BlockchainService implements OnModuleInit {
             const amountWei = ethers.parseUnits(amountUsdc.toString(), 6);
             const escrowAddr = await this.escrowContract.getAddress();
 
+            // Explicitly manage nonces to avoid "Nonce too low" errors with fast local mining
+            let nonce = await this.provider.getTransactionCount(this.wallet.address);
+
             // 1. Approve
-            this.logger.log(`Approving ${amountUsdc} USDC for escrow...`);
-            const approveTx = await this.usdcContract.approve(escrowAddr, amountWei);
+            this.logger.log(`Approving ${amountUsdc} USDC for escrow (nonce: ${nonce})...`);
+            const approveTx = await this.usdcContract.approve(escrowAddr, amountWei, { nonce });
             await approveTx.wait();
 
+            // Increment nonce for the next transaction
+            nonce++;
+
             // 2. Deposit
-            this.logger.log(`Depositing for remittance ${remittanceId}...`);
-            const depositTx = await this.escrowContract.deposit(remittanceId);
+            this.logger.log(`Depositing for remittance ${remittanceId} (nonce: ${nonce})...`);
+            const depositTx = await this.escrowContract.deposit(remittanceId, { nonce });
             const receipt = await depositTx.wait();
 
             this.logger.log(`Deposited funds, tx: ${receipt.hash}`);
